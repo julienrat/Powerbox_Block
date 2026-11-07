@@ -45,7 +45,9 @@ from .scan import ScanImpossible, adresse_valide, scanner
 from .simulation import SimulatedPowerBox
 
 WEB_DIR = Path(__file__).with_name("web")
-WATCHDOG_S = 3.0
+WATCHDOG_S = 3.0     # plus de nouvelles de la page : moteurs arrêtés
+GRACE_S = 12.0       # coupure courte cachée à la page pendant la reconnexion
+VEILLE_S = 60.0      # plus aucune page : le boîtier est libéré
 
 
 class Pilote:
@@ -59,6 +61,10 @@ class Pilote:
         self.box = SimulatedPowerBox(verbose=False).connect() if simulation else None
         self.voulu = False            # l'utilisateur a demandé la connexion (bouton Connecter)
         self.dernier_contact = time.monotonic()
+        self.en_veille = False
+        self._connecte_depuis = 0.0
+        self._coupe_a: float | None = None    # moment de la dernière coupure d'un lien établi
+        self._echecs = 0
         self._lock = threading.Lock()
         self._fin = threading.Event()
         self._reveil = threading.Event()
@@ -81,52 +87,95 @@ class Pilote:
                 print(f"  🎯 boîtier choisi : {adresse}", flush=True)
         self.voulu = True
         self.message = "recherche du boîtier…"
+        self._echecs = 0
+        self._coupe_a = None
         self._reveil.set()
 
     def deconnecter(self) -> None:
         self.voulu = False
         self.message = ""
+        self._coupe_a = None
         self._reveil.set()
 
     def _attendre(self, s: float) -> None:
         self._reveil.wait(s)
         self._reveil.clear()
 
+    def _page_active(self, secondes: float) -> bool:
+        return time.monotonic() - self.dernier_contact < secondes
+
+    def _liberer(self, raison: str) -> None:
+        with self._lock:
+            box, self.box = self.box, None
+        if box is not None:
+            box.close()
+            print(f"  ⏏  boîtier {box.conn.address} libéré ({raison})", flush=True)
+
     def _boucle_connexion(self) -> None:
-        """Tant que la connexion est voulue : se connecte, et se reconnecte si le lien tombe."""
+        """Tant que la connexion est voulue : se connecte, et se reconnecte si le lien tombe.
+
+        - coupure courte : reconnexion immédiate ; la page continue d'afficher « connecté »
+          (GRACE_S) pour éviter les clignotements et les messages à répétition ;
+        - échecs répétés : on espace les essais (2, 4, 8, puis 15 s) ;
+        - plus aucune page ouverte depuis VEILLE_S : on libère le boîtier et on ne réessaie plus
+          (la connexion reprend toute seule quand une page revient).
+        """
         while not self._fin.is_set():
             # pas voulu, ou connecté à un autre boîtier que celui choisi : on libère
             autre = self.box is not None and self.box.conn.address.upper() != self.adresse
             if not self.voulu or autre:
-                if self.box is not None:
-                    with self._lock:
-                        box, self.box = self.box, None
-                    box.close()
-                    print(f"  ⏏  boîtier {box.conn.address} déconnecté", flush=True)
+                self._liberer("déconnexion demandée" if not self.voulu else "autre boîtier choisi")
+                self._coupe_a = None
                 if not self.voulu:
                     self._attendre(1)
                 continue
-            if self.connecte:
+            if not self._page_active(VEILLE_S):
+                if self.box is not None:
+                    self._liberer("plus aucune page ouverte, reconnexion au retour de la page")
+                self.en_veille = True
+                self._coupe_a = None
                 self._attendre(1)
                 continue
-            self.message = "recherche du boîtier…"
+            self.en_veille = False
+            if self.connecte:
+                self._attendre(0.3)
+                continue
+            if self.box is not None:      # le lien vient de tomber
+                duree = time.monotonic() - self._connecte_depuis
+                print(f"  ⚡ liaison coupée après {duree:.0f} s, reconnexion…", flush=True)
+                self._liberer("liaison coupée")
+                self._coupe_a = time.monotonic()
             box = PowerBox(self.adresse)
             try:
                 box.connect(timeout=8)
             except OSError as e:
                 if self.voulu:
-                    self.message = f"boîtier introuvable ({e.strerror or e})"
-                    print(f"  … {self.message}, nouvel essai dans 3 s", flush=True)
-                    self._attendre(3)
+                    self._echecs += 1
+                    delai = min(15, 2 ** self._echecs)
+                    if not self._en_reconnexion():
+                        self.message = f"boîtier introuvable ({e.strerror or e})"
+                    print(f"  … boîtier introuvable ({e.strerror or e}), nouvel essai dans {delai} s", flush=True)
+                    self._attendre(delai)
                 continue
             if not self.voulu or box.conn.address.upper() != self.adresse:   # annulé / changé
                 box.close()
                 continue
             with self._lock:
+                if not self._page_active(WATCHDOG_S):    # sécurité : personne ne pilote
+                    self.vitesses = dict.fromkeys(self.vitesses, 0)
                 self.box = box
                 self._envoyer()
+            reconnexion = self._coupe_a is not None
+            self._connecte_depuis = time.monotonic()
+            self._coupe_a = None
+            self._echecs = 0
             self.message = "connecté"
-            print(f"  ✅ boîtier {self.adresse} connecté", flush=True)
+            print(f"  ✅ boîtier {self.adresse} {'reconnecté' if reconnexion else 'connecté'}", flush=True)
+
+    def _en_reconnexion(self) -> bool:
+        """Coupure récente d'un lien qui marchait : on la cache à la page pendant GRACE_S."""
+        return (self.voulu and not self.connecte and self._coupe_a is not None
+                and time.monotonic() - self._coupe_a < GRACE_S)
 
     def _boucle_securite(self) -> None:
         while not self._fin.wait(0.5):
@@ -161,8 +210,11 @@ class Pilote:
         self.dernier_contact = time.monotonic()
 
     def etat(self) -> dict:
-        return {"connecte": self.connecte, "simulation": self.simulation, "adresse": self.adresse,
-                "voulu": self.voulu, "message": self.message, "vitesses": {k.upper(): v for k, v in self.vitesses.items()}}
+        reconnexion = self._en_reconnexion()
+        return {"connecte": self.connecte or reconnexion, "reconnexion": reconnexion,
+                "simulation": self.simulation, "adresse": self.adresse, "voulu": self.voulu,
+                "message": "connecté" if reconnexion else self.message,
+                "vitesses": {k.upper(): v for k, v in self.vitesses.items()}}
 
 
 class Gestionnaire(SimpleHTTPRequestHandler):

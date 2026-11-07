@@ -6,13 +6,13 @@ avec des blocs, avec de grosses tuiles pour les tout-petits, ou en Python.
 
 | Mode | Pour qui | Comment |
 |---|---|---|
-| **PowerBox Petits** | dès 3 ans, sans savoir lire | de grosses tuiles posées sur une ligne, un robot qui avance case par case |
+| **PowerBox Petits** | dès 3 ans, sans savoir lire | de grosses tuiles posées sur une ligne ; le robot avance case par case pour ramasser ses pièces, niveau après niveau |
 | **PowerBox Blocs** | dès qu'on lit un peu | des blocs façon Scratch, en français, avec un robot virtuel |
 | **Python « facile »** | pour passer au vrai code | `avancer(2)`, `moteur("A", 80)`… Les blocs se traduisent en Python |
 
 <p align="center">
   <img src="docs/images/blocs.png" alt="PowerBox Blocs : un programme qui dessine un carré, les engrenages des moteurs et le robot virtuel" width="49%">
-  <img src="docs/images/petits.png" alt="PowerBox Petits : une ligne de grosses tuiles flèches, le robot et l'étoile à attraper" width="49%">
+  <img src="docs/images/petits.png" alt="PowerBox Petits : une ligne de grosses tuiles flèches, le robot, des caisses et des pièces de robot à ramasser" width="49%">
 </p>
 
 **État** : les moteurs du boîtier tournent pour de vrai (testé le 07/11/2026 sur un ThinkPad X390
@@ -96,7 +96,20 @@ python3 -m powerbox.serveur --simulation    # sans boîtier
      n'émet plus de signal pour être trouvé ;
    - on peut aussi taper l'adresse à la main.
 3. Le voyant passe au vert. **⏏ Déconnecter** arrête les moteurs et libère le boîtier. Un clic sur
-   le voyant vert permet de changer de boîtier. Si le lien tombe, le serveur se reconnecte tout seul.
+   le voyant vert permet de changer de boîtier.
+
+**Coupures et reconnexions** :
+- Si le lien tombe, le serveur se reconnecte aussitôt, sans rien afficher. Pendant une coupure
+  courte (moins de 12 s), le voyant reste vert.
+- Le message « boîtier introuvable » ne s'affiche qu'après un clic sur Connecter, jamais pendant
+  les reconnexions automatiques.
+- Si les essais échouent, ils s'espacent (2, 4, 8 puis 15 s) au lieu de s'enchaîner.
+- **Sécurité** :
+  - après une reconnexion, les moteurs ne reprennent que si une page pilote encore ; sinon ils
+    restent à l'arrêt ;
+  - si plus aucune page n'est ouverte depuis 60 s, le serveur libère le boîtier et arrête les
+    essais ; il se reconnecte dès qu'une page revient.
+- Le terminal du serveur note chaque coupure avec sa durée (« liaison coupée après 30 s »).
 
 Le mode Petits a un simple rond en haut à droite, qui se connecte au dernier boîtier choisi.
 
@@ -110,14 +123,24 @@ robots-abeilles de maternelle, sans rien à lire.
   Une case « + » montre où ira la suivante.
 - **▶** lance le programme. Chaque tuile s'allume à son tour et une voix la dit (« Avance ! »).
   Le vrai robot bouge, et le robot de l'écran avance **case par case**.
-- **Une étoile ⭐** est posée sur le terrain. Quand le robot l'atteint, c'est la fête et elle change
-  de place.
+- **Le jeu : réparer le robot.** Des **pièces de robot** sont posées sur le terrain : engrenage,
+  écrou, pile, roue. Le robot les ramasse en passant dessus, et chacune rapporte un point
+  (🏆 en haut à droite). En haut à gauche, on voit le numéro du niveau et les pièces encore à trouver.
+- **Des caisses** bloquent certaines cases : le robot de l'écran bute dessus et reste sur place.
+- **Les niveaux** : quand toutes les pièces sont ramassées, le robot est réparé. C'est la fête, puis on
+  passe au niveau suivant avec une ligne vide. Les 8 premiers niveaux sont dessinés (tout droit, un
+  virage, une caisse à contourner…). Après, ils sont tirés au hasard, en vérifiant qu'on peut atteindre
+  toutes les pièces. Le niveau et le score sont gardés d'une fois sur l'autre.
 - Toucher une tuile de la ligne la fait seulement entendre, elle n'est pas effacée. **⌫** enlève
-  la dernière tuile. **🗑️** efface tout, puis devient **↩️ annuler** pendant 5 s. **🏠** ramène
-  le robot de l'écran au départ.
-- **⚙️ (pour les grands)** : durée d'un pas, durée d'un quart de tour, vitesse, voix. Il faut
-  **régler le quart de tour sur le vrai robot** pour qu'il tourne d'un angle droit. La valeur de
-  départ, 0,55 s, n'a pas été mesurée.
+  la dernière tuile. **🗑️** efface tout, puis devient **↩️ annuler** pendant 5 s. **🏠**
+  recommence le niveau : le robot revient au départ et les pièces reviennent, le score est gardé.
+- **⚙️ (pour les grands)** : durée d'un pas, durée d'un quart de tour, vitesse, voix, choix du niveau,
+  remise à zéro du score. Toucher le numéro du niveau ouvre aussi ces réglages. Il faut **régler
+  le quart de tour sur le vrai robot** pour qu'il tourne d'un angle droit. La valeur de départ,
+  0,55 s, n'a pas été mesurée.
+
+Le vrai robot exécute toujours les tuiles, même quand celui de l'écran bute contre une caisse ou
+un bord.
 
 La voix est celle du navigateur. Sous Linux, Chrome n'a pas toujours de voix française : les tuiles
 jouent alors seulement leur note.
@@ -283,10 +306,16 @@ cocher « inverser » pour la roue qui tourne à l'envers, ou changer les sortie
 **Le vrai robot ne tourne pas d'un angle droit (mode Petits)** : régler « durée d'un quart de tour »
 dans ⚙️.
 
-**Des notifications « connecté / déconnecté » s'affichent sans arrêt** : elles viennent de blueman.
-Pour les couper :
+**Des notifications « connecté / déconnecté » s'affichent sans arrêt** : celles du bureau viennent de
+blueman. Pour les couper :
 `gsettings set org.blueman.general plugin-list "['!ConnectionNotifier']"`
 (et `"[]"` pour les remettre).
+
+**La liaison tombe régulièrement (environ toutes les 30 s ?)** : c'est une piste, pas encore vérifiée.
+`bluetoothd` envoie au boîtier une négociation de taille des paquets (« Exchange MTU »), à laquelle
+le boîtier ne répond jamais, et il pourrait couper la liaison au bout de 30 s. Le serveur se
+reconnecte tout seul, sans rien afficher. Le terminal du serveur indique la durée de chaque
+liaison : si elle tourne autour de 30 s, c'est cette cause.
 
 **L'AppImage ne se lance pas (« FUSE »)** : `./PowerBox-x86_64.AppImage --appimage-extract-and-run`,
 ou installer `libfuse2`.

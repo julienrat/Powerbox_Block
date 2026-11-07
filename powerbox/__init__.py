@@ -5,4 +5,4 @@ from .protocol import (STOP_FRAME, Status, build_frame, checksum, decode_speed,
 
 __all__ = ["PowerBox", "DEFAULT_ADDRESS", "build_frame", "parse_frame", "encode_speed",
            "decode_speed", "checksum", "parse_status", "Status", "STOP_FRAME"]
-__version__ = "0.1.0"
+__version__ = "0.2.0"

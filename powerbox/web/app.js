@@ -103,6 +103,7 @@ function afficherBoitiers(boitiers, erreur, enCours) {
 function choisirBoitier(adresse) {
   choix.close();
   stock.ecrire('pb-boitier', adresse);
+  connexionDemandee = true;
   pb.stop();
   liaison.commandeServeur('connecter', { adresse });
   toast('🔵 Connexion à « ' + nomBoitier(adresse) + ' »…');
@@ -121,6 +122,7 @@ $('#btn-adresse').addEventListener('click', () => {
 choix.addEventListener('close', () => numeroScan++);   // ignore un scan en cours
 
 let dernierMessage = '';
+let connexionDemandee = false;      // vrai entre le clic sur un boîtier et la 1re réponse
 function afficherStatut() {
   const p = $('#statut'), bouton = $('#btn-connexion');
   let cls, txt, titre = '', btn = null;    // btn : [texte, déjà connecté ?] ou null = caché
@@ -131,12 +133,16 @@ function afficherStatut() {
     if (e.simulation) {
       [cls, txt, titre] = ['simu', '🖥️ Simulation', 'Serveur lancé avec --simulation'];
     } else if (e.connecte) {
+      connexionDemandee = false;
       const nom = surnoms[e.adresse] ? '✅ ' + surnoms[e.adresse] : '✅ Boîtier connecté';
       [cls, txt, titre, btn] = ['ok', nom, e.adresse + ' — clic pour changer de boîtier', ['⏏ Déconnecter', true]];
     } else if (e.voulu) {
       [cls, txt, titre, btn] = ['attente', '🔎 Connexion…', nomBoitier(e.adresse) + ' : ' + (e.message || ''), ['✖ Annuler', true]];
-      if (e.message && e.message !== dernierMessage && e.message.startsWith('boîtier introuvable')) {
+      // message seulement juste après un clic sur « Connecter », jamais pendant les
+      // reconnexions automatiques (sinon il reviendrait sans arrêt)
+      if (connexionDemandee && e.message && e.message !== dernierMessage && e.message.startsWith('boîtier introuvable')) {
         toast('😕 ' + e.message + '. Je réessaie… Le boîtier est-il allumé ?', 'erreur');
+        connexionDemandee = false;
       }
     } else {
       [cls, txt, titre, btn] = ['off', '⚪ Pas connecté', 'Seul le robot virtuel bouge.', ['🔵 Connecter', false]];

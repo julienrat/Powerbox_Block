@@ -51,10 +51,49 @@ main {
 }
 #grille { position: absolute; display: grid; }
 #grille div { border: 2px dashed #BFE3CD; margin: -1px; }
-#robot, #etoile { position: absolute; left: 0; top: 0; will-change: transform; }
-#robot svg { width: 100%; height: 100%; display: block; filter: drop-shadow(0 6px 6px rgba(0, 0, 0, .18)); }
-#etoile { display: grid; place-items: center; animation: brille 1.6s ease-in-out infinite; }
-@keyframes brille { 50% { scale: 1.15; rotate: 12deg; } }
+#grille div.depart { background: #D3F0DE; }
+#robot, .objet { position: absolute; left: 0; top: 0; will-change: transform; }
+#robot { z-index: 2; }
+#robot svg, .objet svg { width: 100%; height: 100%; display: block; }
+#robot svg { filter: drop-shadow(0 6px 6px rgba(0, 0, 0, .18)); }
+.objet.piece svg { filter: drop-shadow(0 3px 3px rgba(0, 0, 0, .2)); }
+.objet.piece::before {                 /* halo fixe sous la pièce : visible, sans bouger */
+  content: ""; position: absolute; inset: -10%; border-radius: 50%;
+  background: radial-gradient(circle, #FFF7C2 0%, #FFF7C200 70%);
+}
+.objet.piece svg { position: relative; }
+.objet.prise { transition: transform .5s ease-in, opacity .5s ease-in !important; opacity: 0; }
+
+/* ---------- barre du jeu (niveau, pièces, score) ---------- */
+#hud {
+  position: absolute; top: 10px; left: 12px; right: 12px; z-index: 3;
+  display: flex; gap: 10px; align-items: center; pointer-events: none;
+}
+.hud-bulle {
+  display: flex; align-items: center; gap: 6px;
+  background: #ffffffE6; border-radius: 999px; padding: 6px 14px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, .1);
+  font: 700 22px var(--police); color: var(--texte); border: 0;
+}
+#niveau { pointer-events: auto; }
+#niveau .num { background: #6366F1; color: #fff; border-radius: 50%; width: 32px; height: 32px; display: grid; place-items: center; font-size: 18px; }
+#a-trouver { gap: 4px; padding: 5px 10px; }
+#a-trouver .case-piece { width: 36px; height: 36px; border-radius: 10px; background: #EEF2F7; display: grid; place-items: center; }
+#a-trouver .case-piece svg { width: 80%; height: 80%; filter: grayscale(1) opacity(.3); transition: filter .3s; }
+#a-trouver .case-piece.ok { background: #FEF3C7; }
+#a-trouver .case-piece.ok svg { filter: none; }
+#a-trouver .case-piece.pop { animation: pop .5s ease-out; }
+@keyframes pop { 40% { transform: scale(1.5); } }
+#score { margin-left: auto; }
+#score .trophee { font-size: 24px; }
+#score.pop { animation: pop .5s ease-out; }
+
+#bravo {
+  position: absolute; inset: 0; z-index: 4; display: grid; place-items: center;
+  background: #FFFFFFAA; font-size: 120px;
+}
+#bravo[hidden] { display: none; }
+#bravo span { animation: pop .8s ease-out; }
 #robot.saute svg { animation: saute .25s ease-in-out 4 alternate; }
 @keyframes saute { to { transform: translateY(-18%); } }
 #robot.danse svg { animation: danse .25s ease-in-out 6 alternate; }

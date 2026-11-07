@@ -21,7 +21,13 @@
     <!-- le terrain : le robot avance case par case -->
     <section id="scene" aria-label="Le robot">
       <div id="grille"></div>
-      <div id="etoile" aria-hidden="true">⭐</div>
+      <div id="objets" aria-hidden="true"></div>
+      <!-- en haut : niveau, pièces à ramasser, score -->
+      <div id="hud">
+        <button id="niveau" class="hud-bulle" title="Changer de niveau (pour les grands)"></button>
+        <div id="a-trouver" class="hud-bulle" aria-label="Pièces à ramasser"></div>
+        <div id="score" class="hud-bulle" aria-label="Score"></div>
+      </div>
       <div id="robot" aria-hidden="true">
         <svg viewBox="-50 -50 100 100">
           <rect x="-44" y="-26" width="14" height="52" rx="5" fill="#2B3550"/>
@@ -33,7 +39,8 @@
           <path d="M0 -44 L-9 -34 H9 Z" fill="#FFD84D"/>
         </svg>
       </div>
-      <button id="btn-maison" class="rond petit" title="Remettre le robot au départ" aria-label="Remettre le robot au départ">🏠</button>
+      <button id="btn-maison" class="rond petit" title="Recommencer le niveau" aria-label="Recommencer le niveau">🏠</button>
+      <div id="bravo" hidden><span>🎉</span></div>
     </section>
 
     <!-- le programme : une ligne de tuiles, lue de gauche à droite -->
@@ -70,6 +77,8 @@
       <label>Durée d’un quart de tour <span><input type="number" id="r-quart" min="0.1" max="5" step="0.05"> s</span></label>
       <label>Vitesse du robot <span><input type="number" id="r-vitesse" min="20" max="100" step="5"> %</span></label>
       <label class="case"><input type="checkbox" id="r-voix"> une voix lit les tuiles</label>
+      <label>Niveau <span><input type="number" id="r-niveau" min="1" max="99" step="1"></span></label>
+      <button type="button" id="btn-zero" class="btn">Remettre le score à zéro</button>
       <p class="aide">Règle le quart de tour pour que le vrai robot tourne d’un angle droit.
         Les roues (gauche / droite) se règlent dans le mode Blocs.</p>
       <div class="boutons">

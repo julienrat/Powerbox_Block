@@ -1,6 +1,10 @@
 /* PowerBox Petits : programmer le robot avec de grosses tuiles, lues de gauche à droite.
  * Pour les enfants qui ne lisent pas encore (dès 3 ans) : aucune lecture nécessaire, une voix
  * dit chaque tuile, le robot virtuel avance case par case comme un robot-abeille.
+ *
+ * Le jeu : ramasser les pièces du robot (engrenage, écrou, pile, roue) en évitant les caisses.
+ * Toutes les pièces ramassées = robot réparé = niveau suivant. Chaque pièce rapporte 1 point.
+ *
  * Utilise commun.js (liaison avec le boîtier, réglages des roues, sons).
  */
 'use strict';
@@ -20,12 +24,91 @@ const ACTIONS = {
 };
 const MAX_TUILES = 12;
 const COLS = 7, LIGNES = 4;
-const DEPART = { col: 1, ligne: LIGNES - 1, dir: 0 };
 const DIRS = [[0, -1], [1, 0], [0, 1], [-1, 0]];   // haut, droite, bas, gauche
 
+// --- dessins : pièces du robot et caisse ----------------------------------------------------
+function engrenage(dents, rExt, rInt) {
+  const pts = [];
+  for (let i = 0; i < dents; i++) {
+    const a = (i / dents) * Math.PI * 2, d = Math.PI * 2 / dents;
+    for (const [f, r] of [[0, rInt], [0.12, rExt], [0.42, rExt], [0.54, rInt]]) {
+      pts.push(`${(50 + Math.cos(a + f * d) * r).toFixed(1)} ${(50 + Math.sin(a + f * d) * r).toFixed(1)}`);
+    }
+  }
+  return 'M' + pts.join('L') + 'Z';
+}
+const PIECES = {
+  engrenage: `<svg viewBox="0 0 100 100"><path d="${engrenage(9, 46, 35)}" fill="#F59E0B" stroke="#B45309" stroke-width="3"/>
+    <circle cx="50" cy="50" r="13" fill="#FFF7E6" stroke="#B45309" stroke-width="3"/></svg>`,
+  ecrou: `<svg viewBox="0 0 100 100"><path d="M50 6 L88 28 V72 L50 94 L12 72 V28 Z" fill="#60A5FA" stroke="#1D4ED8" stroke-width="4"/>
+    <circle cx="50" cy="50" r="17" fill="#EFF6FF" stroke="#1D4ED8" stroke-width="4"/></svg>`,
+  pile: `<svg viewBox="0 0 100 100"><rect x="40" y="6" width="20" height="10" rx="3" fill="#166534"/>
+    <rect x="24" y="14" width="52" height="80" rx="10" fill="#22C55E" stroke="#166534" stroke-width="4"/>
+    <path d="M50 34 V58 M38 46 H62" stroke="#fff" stroke-width="8" stroke-linecap="round"/></svg>`,
+  roue: `<svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="44" fill="#334155"/>
+    <circle cx="50" cy="50" r="44" fill="none" stroke="#1E293B" stroke-width="6" stroke-dasharray="7 7"/>
+    <circle cx="50" cy="50" r="20" fill="#F43F5E" stroke="#BE123C" stroke-width="4"/><circle cx="50" cy="50" r="6" fill="#fff"/></svg>`,
+};
+const ORDRE_PIECES = ['engrenage', 'ecrou', 'pile', 'roue'];
+const CAISSE = `<svg viewBox="0 0 100 100"><rect x="6" y="6" width="88" height="88" rx="10" fill="#C2884D" stroke="#7C4A1E" stroke-width="5"/>
+  <path d="M14 14 L86 86 M86 14 L14 86" stroke="#7C4A1E" stroke-width="7" stroke-linecap="round"/>
+  <rect x="6" y="6" width="88" height="88" rx="10" fill="none" stroke="#7C4A1E" stroke-width="5"/></svg>`;
+
+// --- les niveaux : ^ > v < = départ du robot et sa direction, P = pièce, # = caisse ------------
+const NIVEAUX = [
+  ['.......', '..P....', '.......', '..^....'],     // tout droit
+  ['..P....', '.......', '..P....', '..^....'],     // deux pièces sur la route
+  ['.......', '.......', '.......', '^..P...'],     // tourner une fois
+  ['...P...', '.......', '.......', '>..P...'],     // avancer, tourner, avancer
+  ['.......', '.......', '.......', '>.#.P..'],     // une caisse sur le chemin
+  ['.P...P.', '.#...#.', '.......', '...^...'],     // deux pièces derrière des caisses
+  ['P..#..P', '..#.#..', '.......', '...^...'],
+  ['P#...#P', '.#.P.#.', '.......', '...^...'],
+];
+
+function niveauAuHasard(n) {             // au-delà des niveaux dessinés, en s'assurant que c'est faisable
+  for (;;) {
+    const g = Array.from({ length: LIGNES }, () => Array(COLS).fill('.'));
+    const libre = () => {
+      for (;;) {
+        const c = Math.floor(Math.random() * COLS), l = Math.floor(Math.random() * LIGNES);
+        if (g[l][c] === '.') return [c, l];
+      }
+    };
+    const [rc, rl] = libre();
+    g[rl][rc] = '^>v<'[Math.floor(Math.random() * 4)];
+    for (let i = 0; i < Math.min(5, 2 + Math.floor(n / 4)); i++) { const [c, l] = libre(); g[l][c] = '#'; }
+    for (let i = 0; i < 3; i++) { const [c, l] = libre(); g[l][c] = 'P'; }
+    const carte = g.map((r) => r.join(''));
+    if (faisable(carte)) return carte;
+  }
+}
+
+function faisable(carte) {               // toutes les pièces sont-elles atteignables ?
+  let depart;
+  carte.forEach((r, l) => [...r].forEach((ch, c) => { if ('^>v<'.includes(ch)) depart = [c, l]; }));
+  const vu = new Set([depart.join()]), file = [depart];
+  while (file.length) {
+    const [c, l] = file.shift();
+    for (const [dx, dy] of DIRS) {
+      const nc = c + dx, nl = l + dy;
+      if (nc < 0 || nl < 0 || nc >= COLS || nl >= LIGNES || carte[nl][nc] === '#' || vu.has(nc + ',' + nl)) continue;
+      vu.add(nc + ',' + nl);
+      file.push([nc, nl]);
+    }
+  }
+  return carte.every((r, l) => [...r].every((ch, c) => ch !== 'P' || vu.has(c + ',' + l)));
+}
+
+// --- état -------------------------------------------------------------------------------
 const opts = { pas: 1, quart: 0.55, vitesse: 70, voix: true, ...stock.lire('pb-petits', {}) };
+const jeu = { niveau: 1, score: 0, ...stock.lire('pb-petits-jeu', {}) };
 let programme = stock.lire('pb-petits-prog', []).filter((a) => ACTIONS[a]).slice(0, MAX_TUILES);
 let enCours = false;
+let carte = [];                           // niveau en cours
+let depart = { col: 0, ligne: 0, dir: 0 };
+let pieces = [];                          // { col, ligne, type, el, prise }
+let caisses = new Set();                  // "col,ligne"
 
 // --- voix --------------------------------------------------------------------------------
 let voixFr = null;
@@ -56,6 +139,7 @@ function melodie(notes, duree = 0.18) {
 
 // --- attente interruptible ------------------------------------------------------------------
 class Arret extends Error {}
+class NiveauFini extends Error {}
 const attentes = new Set();
 function dormir(s) {
   return new Promise((res, rej) => {
@@ -77,25 +161,24 @@ function roues(g, d) {
 // =========================================================================================
 // Terrain
 // =========================================================================================
-const scene = $('#scene'), grille = $('#grille'), elRobot = $('#robot'), elEtoile = $('#etoile');
-const robot = { ...DEPART, rot: 0 };
-const etoile = { col: 5, ligne: 1 };
+const scene = $('#scene'), grille = $('#grille'), elRobot = $('#robot'), objets = $('#objets');
+const robot = { col: 0, ligne: 0, dir: 0, rot: 0 };
 let geo = { cell: 80, ox: 0, oy: 0 };
+const HAUT_HUD = 58;                      // place réservée en haut pour la barre du jeu
 
 function disposer() {
   const r = scene.getBoundingClientRect();
-  const cell = Math.floor(Math.min((r.width - 16) / COLS, (r.height - 16) / LIGNES));
-  geo = { cell, ox: (r.width - cell * COLS) / 2, oy: (r.height - cell * LIGNES) / 2 };
+  const cell = Math.floor(Math.min((r.width - 16) / COLS, (r.height - HAUT_HUD - 12) / LIGNES));
+  geo = { cell, ox: (r.width - cell * COLS) / 2, oy: HAUT_HUD + (r.height - HAUT_HUD - cell * LIGNES) / 2 };
   Object.assign(grille.style, {
     left: geo.ox + 'px', top: geo.oy + 'px', width: cell * COLS + 'px', height: cell * LIGNES + 'px',
     gridTemplateColumns: `repeat(${COLS}, 1fr)`, gridTemplateRows: `repeat(${LIGNES}, 1fr)`,
   });
-  if (grille.children.length !== COLS * LIGNES) {
-    grille.innerHTML = '<div></div>'.repeat(COLS * LIGNES);
-  }
-  placer(elRobot, robot.col, robot.ligne, robot.rot, 0, 0.82);
-  placer(elEtoile, etoile.col, etoile.ligne, 0, 0, 0.6);
-  elEtoile.style.fontSize = geo.cell * 0.5 + 'px';
+  if (grille.children.length !== COLS * LIGNES) grille.innerHTML = '<div></div>'.repeat(COLS * LIGNES);
+  [...grille.children].forEach((d, i) => d.classList.toggle('depart', i === depart.ligne * COLS + depart.col));
+  bougerRobot(0);
+  for (const p of pieces) if (!p.prise) placer(p.el, p.col, p.ligne, 0, 0, 0.7);
+  for (const el of objets.querySelectorAll('.caisse')) placer(el, +el.dataset.col, +el.dataset.ligne, 0, 0, 0.86);
 }
 
 function placer(el, col, ligne, rot, duree, taille) {
@@ -116,22 +199,100 @@ function animer(classe, duree) {
   setTimeout(() => elRobot.classList.remove(classe), duree * 1000);
 }
 
-function nouvelleEtoile() {
-  let c, l;
-  do {
-    c = Math.floor(Math.random() * COLS);
-    l = Math.floor(Math.random() * LIGNES);
-  } while ((c === robot.col && l === robot.ligne) || (c === etoile.col && l === etoile.ligne));
-  Object.assign(etoile, { col: c, ligne: l });
-  placer(elEtoile, c, l, 0, 0, 0.6);
+// --- niveaux ------------------------------------------------------------------------------
+function chargerNiveau(n) {
+  jeu.niveau = Math.max(1, Math.min(99, n | 0));
+  stock.ecrire('pb-petits-jeu', jeu);
+  carte = jeu.niveau <= NIVEAUX.length ? NIVEAUX[jeu.niveau - 1] : niveauAuHasard(jeu.niveau);
+  objets.innerHTML = '';
+  pieces = [];
+  caisses = new Set();
+  let k = 0;
+  carte.forEach((rangee, ligne) => [...rangee].forEach((ch, col) => {
+    if ('^>v<'.includes(ch)) depart = { col, ligne, dir: '^>v<'.indexOf(ch) };
+    else if (ch === '#') {
+      caisses.add(col + ',' + ligne);
+      const el = document.createElement('div');
+      el.className = 'objet caisse';
+      el.dataset.col = col;
+      el.dataset.ligne = ligne;
+      el.innerHTML = CAISSE;
+      objets.append(el);
+    } else if (ch === 'P') {
+      const type = ORDRE_PIECES[k++ % ORDRE_PIECES.length];
+      const el = document.createElement('div');
+      el.className = 'objet piece';
+      el.innerHTML = PIECES[type];
+      objets.append(el);
+      pieces.push({ col, ligne, type, el, prise: false });
+    }
+  }));
+  Object.assign(robot, depart, { rot: depart.dir * 90 });
+  disposer();
+  majHud();
+}
+
+function recommencerNiveau() {
+  for (const p of pieces) {
+    p.prise = false;
+    p.el.classList.remove('prise');
+    p.el.style.opacity = '';
+  }
+  Object.assign(robot, depart, { rot: depart.dir * 90 });
+  disposer();
+  majHud();
+}
+
+function majHud() {
+  $('#niveau').innerHTML = `<span class="num">${jeu.niveau}</span>`;
+  $('#niveau').setAttribute('aria-label', 'Niveau ' + jeu.niveau);
+  $('#a-trouver').innerHTML = pieces.map((p) =>
+    `<span class="case-piece${p.prise ? ' ok' : ''}">${PIECES[p.type]}</span>`).join('');
+  $('#score').innerHTML = `<span class="trophee">🏆</span>${jeu.score}`;
+}
+
+function ramasser() {                       // après chaque déplacement du robot virtuel
+  const i = pieces.findIndex((p) => !p.prise && p.col === robot.col && p.ligne === robot.ligne);
+  if (i < 0) return;
+  const p = pieces[i];
+  p.prise = true;
+  jeu.score++;
+  stock.ecrire('pb-petits-jeu', jeu);
+  // la pièce monte vers sa case en haut et disparaît
+  const x = geo.ox + p.col * geo.cell, y = geo.oy + p.ligne * geo.cell;
+  p.el.style.transition = 'transform .5s ease-in, opacity .5s ease-in';
+  p.el.style.transform = `translate(${x}px, ${y - geo.cell}px) scale(1.4)`;
+  p.el.classList.add('prise');
+  majHud();
+  $('#a-trouver').children[i]?.classList.add('pop');
+  $('#score').classList.remove('pop');
+  void $('#score').offsetWidth;
+  $('#score').classList.add('pop');
+  melodie(['mi', 'sol', 'do2'], 0.1);
+  if (pieces.every((q) => q.prise)) throw new NiveauFini();
+  parler('Une pièce !');
+}
+
+async function niveauReussi() {
+  const r = scene.getBoundingClientRect();
+  fete(r.left + r.width / 2, r.top + r.height / 2);
+  parler('Bravo ! Le robot est réparé !');
+  animer('saute', 1.2);
+  $('#bravo').hidden = false;
+  await new Promise((res) => setTimeout(res, 2600));
+  $('#bravo').hidden = true;
+  programme = [];
+  dessinerRuban();
+  chargerNiveau(jeu.niveau + 1);
 }
 
 function fete(x, y) {
   const zone = $('#fete');
-  for (let i = 0; i < 16; i++) {
+  const symboles = ['⭐', '🎉', '✨', '🔩', '⚙️'];
+  for (let i = 0; i < 18; i++) {
     const s = document.createElement('span');
-    s.textContent = ['⭐', '🌟', '✨', '🎉'][i % 4];
-    const a = Math.random() * Math.PI * 2, d = 120 + Math.random() * 180;
+    s.textContent = symboles[i % symboles.length];
+    const a = Math.random() * Math.PI * 2, d = 140 + Math.random() * 200;
     s.style.left = x - 22 + 'px';
     s.style.top = y - 22 + 'px';
     s.style.setProperty('--dx', Math.cos(a) * d + 'px');
@@ -140,15 +301,7 @@ function fete(x, y) {
     zone.append(s);
     setTimeout(() => s.remove(), 1700);
   }
-  melodie(['do', 'mi', 'sol', 'do2'], 0.14);
-}
-
-function verifierEtoile() {
-  if (robot.col !== etoile.col || robot.ligne !== etoile.ligne) return;
-  const r = elEtoile.getBoundingClientRect();
-  fete(r.left + r.width / 2, r.top + r.height / 2);
-  parler('Bravo !');
-  nouvelleEtoile();
+  melodie(['do', 'mi', 'sol', 'do2', 'sol', 'do2'], 0.14);
 }
 
 // =========================================================================================
@@ -160,15 +313,18 @@ async function executer(action) {
     const s = action === 'avancer' ? 1 : -1;
     const [dx, dy] = DIRS[robot.dir];
     const c = robot.col + dx * s, l = robot.ligne + dy * s;
-    if (c >= 0 && c < COLS && l >= 0 && l < LIGNES) {
+    const libre = c >= 0 && c < COLS && l >= 0 && l < LIGNES && !caisses.has(c + ',' + l);
+    if (libre) {
       Object.assign(robot, { col: c, ligne: l });
       bougerRobot(opts.pas);
     } else {
-      animer('bute', 0.6);            // bord du terrain : le robot virtuel reste sur place
+      animer('bute', 0.6);            // bord ou caisse : le robot virtuel reste sur place
+      jouerNote('do', 0.25);
     }
     roues(s * v, s * v);
     await dormir(opts.pas);
     roues(0, 0);
+    if (libre) ramasser();
   } else if (action === 'gauche' || action === 'droite') {
     const s = action === 'droite' ? 1 : -1;
     robot.dir = (robot.dir + s + 4) % 4;
@@ -193,7 +349,6 @@ async function executer(action) {
     }
     roues(0, 0);
   }
-  verifierEtoile();
 }
 
 async function lancer() {
@@ -206,7 +361,7 @@ async function lancer() {
   enCours = true;
   majCommandes();
   const tuiles = [...document.querySelectorAll('#tuiles .tuile:not(.vide)')];
-  let fini = false;
+  let fini = false, reussi = false;
   try {
     for (let i = 0; i < programme.length; i++) {
       tuiles.forEach((t, j) => { t.classList.toggle('active', j === i); t.classList.toggle('faite', j < i); });
@@ -217,14 +372,16 @@ async function lancer() {
     }
     fini = true;
   } catch (e) {
-    if (!(e instanceof Arret)) console.error(e);
+    if (e instanceof NiveauFini) reussi = true;
+    else if (!(e instanceof Arret)) console.error(e);
   } finally {
     roues(0, 0);
     enCours = false;
     tuiles.forEach((t) => t.classList.remove('active', 'faite'));
     majCommandes();
-    if (fini) { animer('saute', 1); melodie(['sol', 'do2'], 0.2); }
   }
+  if (reussi) await niveauReussi();
+  else if (fini) { animer('saute', 1); melodie(['sol', 'do2'], 0.2); }
 }
 
 function arreter() {
@@ -348,10 +505,11 @@ $('#btn-vider').addEventListener('click', () => {
   minuteurAnnuler = setTimeout(finAnnuler, 5000);
 });
 
+// 🏠 : le robot retourne au départ et les pièces reviennent (le score est gardé)
 $('#btn-maison').addEventListener('click', () => {
   if (enCours) return;
-  Object.assign(robot, DEPART, { rot: 0 });
-  bougerRobot(0.4);
+  recommencerNiveau();
+  jouerNote('do', 0.15);
 });
 
 // =========================================================================================
@@ -384,13 +542,16 @@ $('#connexion').addEventListener('click', () => {
 });
 
 const dlg = $('#reglages');
-$('#btn-reglages').addEventListener('click', () => {
+function ouvrirReglages() {
   $('#r-pas').value = opts.pas;
   $('#r-quart').value = opts.quart;
   $('#r-vitesse').value = opts.vitesse;
   $('#r-voix').checked = opts.voix;
+  $('#r-niveau').value = jeu.niveau;
   dlg.showModal();
-});
+}
+$('#btn-reglages').addEventListener('click', ouvrirReglages);
+$('#niveau').addEventListener('click', () => { if (!enCours) ouvrirReglages(); });
 dlg.addEventListener('close', () => {
   if (dlg.returnValue !== 'ok') return;
   const nombre = (id, min, max, def) => {
@@ -402,6 +563,13 @@ dlg.addEventListener('close', () => {
   opts.vitesse = nombre('#r-vitesse', 20, 100, 70);
   opts.voix = $('#r-voix').checked;
   stock.ecrire('pb-petits', opts);
+  const n = Math.round(nombre('#r-niveau', 1, 99, jeu.niveau));
+  if (n !== jeu.niveau) chargerNiveau(n);
+});
+$('#btn-zero').addEventListener('click', () => {
+  jeu.score = 0;
+  stock.ecrire('pb-petits-jeu', jeu);
+  majHud();
 });
 $('#btn-deconnecter').addEventListener('click', () => {
   dlg.close();
@@ -420,7 +588,6 @@ window.addEventListener('pagehide', () => {
 
 // --- démarrage ---
 new ResizeObserver(disposer).observe(scene);
-disposer();
-nouvelleEtoile();
+chargerNiveau(jeu.niveau);
 dessinerRuban();
 liaison.demarrer();
