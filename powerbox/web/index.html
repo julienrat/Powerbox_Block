@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>PowerBox Blocs</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🤖</text></svg>">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&display=swap">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="barre">
+    <div class="logo"><span class="logo-icone">🤖</span><span>PowerBox <b>Blocs</b></span></div>
+
+    <div class="commandes">
+      <button id="btn-go" class="btn go" title="Lancer le programme">▶ Démarrer</button>
+      <button id="btn-stop" class="btn stop" title="Tout arrêter (Échap)">■ Stop</button>
+      <button id="btn-lent" class="btn bascule" aria-pressed="false"
+              title="Lentement : chaque bloc s’allume quand il travaille">🐢 Lent</button>
+    </div>
+
+    <div class="vide"></div>
+
+    <span id="statut" class="pastille attente">…</span>
+    <button id="btn-connexion" class="btn connexion" hidden>🔵 Connecter</button>
+    <select id="exemples" class="btn menu" title="Ouvrir un exemple">
+      <option value="">💡 Exemples</option>
+    </select>
+    <div class="outils">
+      <a href="petits.html" class="btn icone" title="Mode tout-petits (3 ans)">👶</a>
+      <button id="btn-nouveau" class="btn icone" title="Nouveau programme">✨</button>
+      <button id="btn-ouvrir" class="btn icone" title="Ouvrir un programme">📂</button>
+      <button id="btn-enregistrer" class="btn icone" title="Enregistrer le programme">💾</button>
+      <button id="btn-reglages" class="btn icone" title="Réglages du robot">⚙️</button>
+    </div>
+    <input type="file" id="fichier" accept=".json,application/json" hidden>
+  </header>
+
+  <main>
+    <div id="blocs"></div>
+
+    <aside class="panneau">
+      <section class="carte">
+        <h2>Les moteurs</h2>
+        <div id="moteurs" class="rangee"></div>
+      </section>
+
+      <section class="carte grande">
+        <div class="onglets" role="tablist">
+          <button role="tab" data-onglet="terrain" aria-selected="true">🗺️ Terrain</button>
+          <button role="tab" data-onglet="python" aria-selected="false">🐍 Python</button>
+        </div>
+        <div id="onglet-terrain" class="onglet">
+          <canvas id="terrain" aria-label="Robot virtuel"></canvas>
+          <div class="pied">
+            <span>Le robot virtuel imite les roues du vrai robot.</span>
+            <button id="btn-effacer" class="btn petit">🧽 Effacer</button>
+          </div>
+        </div>
+        <div id="onglet-python" class="onglet" hidden>
+          <pre id="code-python"></pre>
+          <div class="pied">
+            <span>Ton programme écrit en Python !</span>
+            <span>
+              <button id="btn-copier" class="btn petit">📋 Copier</button>
+              <button id="btn-py" class="btn petit">⬇️ .py</button>
+            </span>
+          </div>
+        </div>
+      </section>
+    </aside>
+  </main>
+
+  <div id="toast" role="status" aria-live="polite"></div>
+
+  <dialog id="choix">
+    <form method="dialog">
+      <h2>🔵 Choisir ta PowerBox</h2>
+      <p class="aide">Allume ton boîtier, puis clique sur lui dans la liste. Le plus proche a le plus de barres.</p>
+      <div id="choix-liste" class="liste-boitiers"></div>
+      <div class="choix-outils">
+        <button type="button" id="btn-chercher" class="btn petit">🔄 Chercher encore</button>
+        <label class="case"><input type="checkbox" id="choix-tous"> voir tous les appareils</label>
+      </div>
+      <details class="manuel">
+        <summary>Taper l’adresse à la main</summary>
+        <div class="ligne">
+          <input id="choix-adresse" placeholder="22:01:01:27:0F:7D" maxlength="17" spellcheck="false" autocomplete="off">
+          <button type="button" id="btn-adresse" class="btn petit">Connecter</button>
+        </div>
+      </details>
+      <div class="boutons">
+        <button value="fermer" class="btn">Fermer</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="reglages">
+    <form method="dialog">
+      <h2>⚙️ Réglages du robot</h2>
+      <p class="aide">Sur quelles prises sont branchées les roues du robot ?</p>
+      <div class="grille">
+        <label>Roue gauche
+          <select id="r-gauche"><option>A</option><option>B</option><option>C</option><option>D</option></select>
+        </label>
+        <label>Roue droite
+          <select id="r-droite"><option>A</option><option>B</option><option>C</option><option>D</option></select>
+        </label>
+        <label class="case"><input type="checkbox" id="r-invg"> inverser la roue gauche</label>
+        <label class="case"><input type="checkbox" id="r-invd"> inverser la roue droite</label>
+      </div>
+      <p class="aide">Si le robot recule quand il devrait avancer, coche « inverser » pour la roue qui tourne à l’envers.</p>
+
+      <div class="boutons">
+        <button value="annuler" class="btn">Annuler</button>
+        <button value="ok" class="btn go">OK</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script src="vendor/blockly/blockly_compressed.js"></script>
+  <script src="vendor/blockly/blocks_compressed.js"></script>
+  <script src="vendor/blockly/javascript_compressed.js"></script>
+  <script src="vendor/blockly/python_compressed.js"></script>
+  <script src="vendor/blockly/msg/fr.js"></script>
+  <script src="commun.js"></script>
+  <script src="blocs.js"></script>
+  <script src="exemples.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

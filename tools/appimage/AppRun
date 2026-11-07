@@ -1,0 +1,45 @@
+#!/bin/sh
+# Lanceur de l'AppImage PowerBox (Python 3.12 embarqué).
+#
+#   PowerBox.AppImage                    ouvre PowerBox Blocs dans le navigateur
+#   PowerBox.AppImage --simulation       … sans boîtier (autres options : --help)
+#   PowerBox.AppImage mon_programme.py   lance un programme Python (from powerbox.facile import *)
+#   PowerBox.AppImage scan               liste les boîtiers à portée
+#   PowerBox.AppImage cli …              ligne de commande d'origine (python3 -m powerbox)
+#   PowerBox.AppImage python …           l'interpréteur Python embarqué
+#   PowerBox.AppImage installer          ajoute PowerBox au menu des applications
+#   PowerBox.AppImage desinstaller       l'enlève du menu
+
+ICI="$(dirname "$(readlink -f "$0")")"
+PY="$ICI/opt/python3.12/bin/python3.12"
+export SSL_CERT_FILE="$ICI/opt/_internal/certs.pem"
+export PYTHONNOUSERSITE=1
+unset PYTHONHOME PYTHONPATH
+
+MENU="${XDG_DATA_HOME:-$HOME/.local/share}/applications/powerbox.desktop"
+ICONE="${XDG_DATA_HOME:-$HOME/.local/share}/icons/hicolor/scalable/apps/powerbox.svg"
+
+case "$1" in
+  *.py)
+    exec "$PY" "$@" ;;
+  python)
+    shift; exec "$PY" "$@" ;;
+  scan)
+    shift; exec "$PY" -m powerbox.scan "$@" ;;
+  cli)
+    shift; exec "$PY" -m powerbox "$@" ;;
+  installer)
+    if [ -z "$APPIMAGE" ]; then echo "À lancer depuis le fichier .AppImage"; exit 1; fi
+    mkdir -p "$(dirname "$MENU")" "$(dirname "$ICONE")"
+    cp "$ICI/powerbox.svg" "$ICONE"
+    sed "s|^Exec=.*|Exec=\"$APPIMAGE\"|" "$ICI/powerbox.desktop" > "$MENU"
+    command -v update-desktop-database >/dev/null && update-desktop-database "$(dirname "$MENU")" 2>/dev/null
+    echo "PowerBox est dans le menu des applications (lien vers $APPIMAGE)."
+    echo "Si tu déplaces le fichier .AppImage, relance « installer »."
+    ;;
+  desinstaller)
+    rm -f "$MENU" "$ICONE"
+    echo "PowerBox est retiré du menu." ;;
+  *)
+    exec "$PY" -m powerbox.serveur --app "$@" ;;
+esac

@@ -25,7 +25,10 @@ bibliothèque ont été testées en simulation. Voir [ce qui reste à vérifier]
 
 ### Avec l'AppImage (le plus simple)
 
-Un seul fichier, qui embarque Python : rien à installer.
+Un seul fichier, qui embarque Python : rien à installer. Linux x86_64 uniquement.
+
+**[⬇️ Télécharger PowerBox-x86_64.AppImage](https://github.com/julienrat/Powerbox_Block/releases/latest/download/PowerBox-x86_64.AppImage)**
+(page des [versions](https://github.com/julienrat/Powerbox_Block/releases))
 
 ```bash
 chmod +x PowerBox-x86_64.AppImage
@@ -63,7 +66,8 @@ paquet `powerbox`, retire ce qui ne sert pas (Tk, pip…), puis empaquette le to
 Il faut Python ≥ 3.9, et aucune dépendance.
 
 ```bash
-cd ~/Developpement/powerbox
+git clone https://github.com/julienrat/Powerbox_Block.git
+cd Powerbox_Block
 python3 -m powerbox.serveur                 # ouvre http://localhost:8080
 python3 -m powerbox.serveur --simulation    # sans boîtier
 ```
@@ -308,7 +312,7 @@ sudo systemctl start bluetooth
 ## Organisation du dossier
 
 ```
-powerbox/
+Powerbox_Block/
 ├── powerbox/                 le paquet Python (aucune dépendance)
 │   ├── protocol.py           trames, encodage des vitesses, somme de contrôle, trames d'état
 │   ├── att.py                transport ATT brut (socket L2CAP, CID 4) sans BlueZ
@@ -329,10 +333,10 @@ powerbox/
 └── tools/
     ├── build-appimage.sh     construit dist/PowerBox-x86_64.AppImage
     ├── appimage/             AppRun, raccourci .desktop, icône
-    ├── blutter-dispatch-dump.patch, re/dart_re.py    outils de rétro-ingénierie
+    └── blutter-dispatch-dump.patch, re/dart_re.py    outils de rétro-ingénierie
 ```
 
-Les fichiers bruts (APK, décompilation jadx) sont restés dans `~/Téléchargements/powerbrick/`.
+L'APK et sa décompilation ne sont pas dans le dépôt.
 
 ## Ce qui reste à vérifier
 
@@ -344,4 +348,7 @@ Les fichiers bruts (APK, décompilation jadx) sont restés dans `~/Téléchargem
 - **Trame d'état** : l'octet `04` est-il le niveau de batterie ?
 - **Mode « diffusion » de l'appli** : sans connexion, comme les boîtiers Mould King, via
   `libble.so`. C'est peut-être le langage de la télécommande. Non décodé.
-# Powerbox_Block
+
+## Licence
+
+Blockly est sous licence Apache-2.0 (voir `powerbox/web/vendor/blockly/`).

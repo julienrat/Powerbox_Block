@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=PowerBox
+GenericName=Programmer le robot
+Comment=Programmer les moteurs du boîtier powerbox avec des blocs (aussi pour les tout-petits)
+Exec=powerbox
+Icon=powerbox
+Categories=Education;Robotics;
+Keywords=robot;lego;blockly;bluetooth;programmation;enfants;
+Terminal=false

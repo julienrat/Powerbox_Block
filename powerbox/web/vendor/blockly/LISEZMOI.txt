@@ -1,0 +1,2 @@
+Blockly 11.2.1 (https://github.com/google/blockly), licence Apache-2.0.
+Fichiers copiés tels quels depuis le paquet npm blockly@11.2.1.

@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+  <title>PowerBox Petits</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🤖</text></svg>">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;700&display=swap">
+  <link rel="stylesheet" href="petits.css">
+</head>
+<body>
+  <!-- coins réservés aux grands -->
+  <a href="index.html" class="coin gauche" title="Retour au mode Blocs">‹ Blocs</a>
+  <div class="coin droite">
+    <button id="connexion" class="rond" title="Connexion au robot" aria-label="Connexion au robot"></button>
+    <button id="btn-reglages" class="rond petit" title="Réglages (pour les grands)" aria-label="Réglages">⚙️</button>
+  </div>
+
+  <main>
+    <!-- le terrain : le robot avance case par case -->
+    <section id="scene" aria-label="Le robot">
+      <div id="grille"></div>
+      <div id="etoile" aria-hidden="true">⭐</div>
+      <div id="robot" aria-hidden="true">
+        <svg viewBox="-50 -50 100 100">
+          <rect x="-44" y="-26" width="14" height="52" rx="5" fill="#2B3550"/>
+          <rect x="30" y="-26" width="14" height="52" rx="5" fill="#2B3550"/>
+          <rect x="-32" y="-38" width="64" height="74" rx="18" fill="#FF6B2C"/>
+          <circle cx="-13" cy="-16" r="9" fill="#fff"/><circle cx="13" cy="-16" r="9" fill="#fff"/>
+          <circle cx="-13" cy="-19" r="4.5" fill="#2B3550"/><circle cx="13" cy="-19" r="4.5" fill="#2B3550"/>
+          <path d="M-12 6 Q0 16 12 6" stroke="#fff" stroke-width="5" fill="none" stroke-linecap="round"/>
+          <path d="M0 -44 L-9 -34 H9 Z" fill="#FFD84D"/>
+        </svg>
+      </div>
+      <button id="btn-maison" class="rond petit" title="Remettre le robot au départ" aria-label="Remettre le robot au départ">🏠</button>
+    </section>
+
+    <!-- le programme : une ligne de tuiles, lue de gauche à droite -->
+    <section id="ruban" aria-label="Mon programme">
+      <div id="tuiles"></div>
+    </section>
+
+    <!-- la palette et les commandes -->
+    <section id="bas">
+      <div id="palette"></div>
+      <div id="commandes">
+        <button id="btn-go" class="cmd go" aria-label="Lancer">
+          <svg viewBox="0 0 100 100"><path d="M34 22 L80 50 L34 78 Z" fill="#fff"/></svg>
+        </button>
+        <button id="btn-retour" class="cmd retour" aria-label="Enlever la dernière tuile">
+          <svg viewBox="0 0 100 100"><path d="M40 24 H80 a8 8 0 0 1 8 8 V68 a8 8 0 0 1 -8 8 H40 L14 50 Z" fill="#fff"/>
+            <path d="M50 38 L70 62 M70 38 L50 62" stroke="#94A3B8" stroke-width="9" stroke-linecap="round"/></svg>
+        </button>
+        <button id="btn-vider" class="cmd vider" aria-label="Tout effacer" title="Tout effacer">
+          <svg viewBox="0 0 100 100"><path d="M28 34 H72 L67 84 H33 Z" fill="#fff"/><rect x="22" y="22" width="56" height="9" rx="4" fill="#fff"/>
+            <rect x="42" y="14" width="16" height="9" rx="3" fill="#fff"/></svg>
+        </button>
+      </div>
+    </section>
+  </main>
+
+  <div id="fete" aria-hidden="true"></div>
+  <div id="toast" role="status" aria-live="polite"></div>
+
+  <dialog id="reglages">
+    <form method="dialog">
+      <h2>⚙️ Réglages (pour les grands)</h2>
+      <label>Durée d’un pas en avant <span><input type="number" id="r-pas" min="0.2" max="5" step="0.1"> s</span></label>
+      <label>Durée d’un quart de tour <span><input type="number" id="r-quart" min="0.1" max="5" step="0.05"> s</span></label>
+      <label>Vitesse du robot <span><input type="number" id="r-vitesse" min="20" max="100" step="5"> %</span></label>
+      <label class="case"><input type="checkbox" id="r-voix"> une voix lit les tuiles</label>
+      <p class="aide">Règle le quart de tour pour que le vrai robot tourne d’un angle droit.
+        Les roues (gauche / droite) se règlent dans le mode Blocs.</p>
+      <div class="boutons">
+        <button type="button" id="btn-deconnecter" class="btn">⏏ Déconnecter le robot</button>
+        <button value="ok" class="btn ok">OK</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script src="commun.js"></script>
+  <script src="petits.js"></script>
+</body>
+</html>

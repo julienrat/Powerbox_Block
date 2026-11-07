@@ -1,0 +1,12 @@
+__pycache__/
+*.pyc
+*.egg-info/
+.venv/
+env/
+build/
+dist/
+# captures et sorties de rétro-ingénierie (volumineuses)
+captures/*.txt
+re-out/
+# réglages locaux de Claude Code
+.claude/

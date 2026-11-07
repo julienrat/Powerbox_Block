@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "powerbox"
+version = "0.1.0"
+description = "Pilotage du boîtier BLE « powerbox » (moteurs compatibles LEGO) depuis Linux"
+readme = "README.md"
+requires-python = ">=3.9"
+dependencies = []
+
+[project.scripts]
+powerbox = "powerbox.cli:main"
+powerbox-blocs = "powerbox.serveur:main"
+
+[tool.setuptools]
+packages = ["powerbox"]
+
+[tool.setuptools.package-data]
+powerbox = [
+    "web/*.html", "web/*.css", "web/*.js",
+    "web/vendor/blockly/*.js", "web/vendor/blockly/*.txt",
+    "web/vendor/blockly/msg/*.js", "web/vendor/blockly/media/*",
+]

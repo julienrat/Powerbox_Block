@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">
+  <defs>
+    <linearGradient id="fond" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#6366F1"/>
+      <stop offset="1" stop-color="#D946EF"/>
+    </linearGradient>
+  </defs>
+  <rect x="8" y="8" width="240" height="240" rx="56" fill="url(#fond)"/>
+  <!-- roues -->
+  <rect x="38" y="92" width="34" height="104" rx="12" fill="#2B3550"/>
+  <rect x="184" y="92" width="34" height="104" rx="12" fill="#2B3550"/>
+  <!-- corps -->
+  <rect x="62" y="56" width="132" height="156" rx="40" fill="#FF6B2C"/>
+  <!-- yeux -->
+  <circle cx="102" cy="104" r="20" fill="#fff"/>
+  <circle cx="154" cy="104" r="20" fill="#fff"/>
+  <circle cx="102" cy="98" r="10" fill="#2B3550"/>
+  <circle cx="154" cy="98" r="10" fill="#2B3550"/>
+  <!-- sourire -->
+  <path d="M100 152 Q128 176 156 152" stroke="#fff" stroke-width="11" fill="none" stroke-linecap="round"/>
+  <!-- antenne -->
+  <path d="M128 28 L110 52 H146 Z" fill="#FFD84D"/>
+</svg>

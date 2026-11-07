@@ -1,0 +1,50 @@
+diff --git a/blutter/src/main.cpp b/blutter/src/main.cpp
+index 6aa46fd..beae969 100644
+--- a/blutter/src/main.cpp
++++ b/blutter/src/main.cpp
+@@ -5,6 +5,10 @@
+ #include "FridaWriter.h"
+ #include "args.hxx"
+ #include <filesystem>
++#include <fstream>
++#include <vm/dispatch_table.h>
++#include <vm/class_table.h>
++#include <vm/isolate.h>
+ 
+ int main(int argc, char** argv)
+ {
+@@ -34,6 +38,34 @@ int main(int argc, char** argv)
+ 		app.LoadInfo();
+ 		app.ExitScope();
+ 
++		app.EnterScope();
++		{
++			auto ig = dart::IsolateGroup::Current();
++			auto dt = ig->dispatch_table();
++			std::ofstream of((outDir / "dispatch.txt").string());
++			if (dt) {
++				const dart::uword* origin = dt->ArrayOrigin();
++				const dart::uword* arr = origin - dart::DispatchTable::kOriginElement;
++				for (intptr_t i = 0; i < dt->length(); i++) {
++					dart::uword v = arr[i];
++					of << std::format("{} {:#x}\n", i - dart::DispatchTable::kOriginElement, v ? (intptr_t)v - app.base() : 0);
++				}
++			} else {
++				of << "no dispatch table\n";
++			}
++			std::ofstream oc((outDir / "classes.txt").string());
++			auto ct = ig->class_table();
++			auto& cls = dart::Class::Handle();
++			auto& sup = dart::Class::Handle();
++			for (intptr_t cid = 1; cid < ct->NumCids(); cid++) {
++				if (!ct->HasValidClassAt(cid)) continue;
++				cls = ct->At(cid);
++				sup = cls.SuperClass();
++				oc << cid << " " << cls.ToCString() << " super=" << (sup.IsNull() ? "null" : sup.ToCString()) << "\n";
++			}
++		}
++		app.ExitScope();
++
+ 		app.EnterScope();
+ #ifndef NO_CODE_ANALYSIS
+ 		std::cout << "Analyzing the application\n";
